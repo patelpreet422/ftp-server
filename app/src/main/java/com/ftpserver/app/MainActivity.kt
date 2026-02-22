@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -249,7 +250,7 @@ private fun AppNavigation(
     onSeedColorChange: (Color) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit
 ) {
-    var currentScreen by remember {
+    var currentScreen by rememberSaveable {
         mutableStateOf(if (startOnMain) ScreenState.Main else ScreenState.Onboarding)
     }
     var isRunning by remember { mutableStateOf(false) }
