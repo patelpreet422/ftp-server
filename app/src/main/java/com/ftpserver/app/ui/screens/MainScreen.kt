@@ -13,6 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Settings
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ftpserver.app.FTPServerService
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MainScreen(
     isRunning: Boolean,
@@ -262,26 +265,18 @@ fun MainScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Column(
+                    FlowRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 48.dp)
+                            .padding(horizontal = 48.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        maxItemsInEachRow = 2
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            DetailItem(label = "IP", value = ip)
-                            DetailItem(label = "Port", value = "$port")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            DetailItem(label = "User", value = user)
-                            DetailItem(label = "Pass", value = password)
-                        }
+                        DetailItem(label = "ip", value = ip)
+                        DetailItem(label = "port", value = "$port")
+                        DetailItem(label = "user", value = user)
+                        DetailItem(label = "pass", value = password)
                     }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {

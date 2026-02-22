@@ -131,7 +131,7 @@ fun FTPServerTheme(
     DynamicMaterialTheme(
         seedColor = seedColor,
         useDarkTheme = isDark,
-        style = PaletteStyle.TonalSpot,
+        style = PaletteStyle.Fidelity,
         typography = AppTypography,
         content = content
     )

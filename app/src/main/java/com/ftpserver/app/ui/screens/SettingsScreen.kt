@@ -89,9 +89,10 @@ fun SettingsScreen(
                     )
                 }
                 Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    text = "settings",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
             }
             Spacer(modifier = Modifier.height(32.dp))
@@ -118,7 +119,7 @@ fun SettingsScreen(
                     // Theme Mode
                     ListItem(
                         headlineContent = {
-                            Text("Theme", color = MaterialTheme.colorScheme.onBackground)
+                            Text("theme", color = MaterialTheme.colorScheme.onBackground)
                         },
                         supportingContent = {
                             Row(
@@ -132,9 +133,9 @@ fun SettingsScreen(
                                         label = {
                                             Text(
                                                 when (mode) {
-                                                    ThemeMode.SYSTEM -> "System"
-                                                    ThemeMode.LIGHT -> "Light"
-                                                    ThemeMode.DARK -> "Dark"
+                                            ThemeMode.SYSTEM -> "system"
+                                            ThemeMode.LIGHT -> "light"
+                                            ThemeMode.DARK -> "dark"
                                                 }
                                             )
                                         }
@@ -148,7 +149,7 @@ fun SettingsScreen(
                     // Accent Color
                     ListItem(
                         headlineContent = {
-                            Text("Accent Color", color = MaterialTheme.colorScheme.onBackground)
+                            Text("accent color", color = MaterialTheme.colorScheme.onBackground)
                         },
                         supportingContent = {
                             LazyRow(
@@ -240,13 +241,13 @@ private fun SettingsSectionHeader(
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
+                    Text(
+                        text = title.lowercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = if (isExpanded) "Collapse" else "Expand",
