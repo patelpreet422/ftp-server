@@ -518,8 +518,20 @@ fun MainScreen(
         label = "GlowPulseAlpha"
     )
     
+    // Background pulse (slower, milder)
+    val bgPulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BgPulseAlpha"
+    )
+    
     // Combined glow alpha (scale controls visibility, pulse adds effect)
     val glowAlpha = glowScale * glowPulseAlpha
+    val bgGlowAlpha = glowScale * bgPulseAlpha
     
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -560,20 +572,19 @@ fun MainScreen(
         ) {
             // Power Button with Background Glow
             Box(contentAlignment = Alignment.Center) {
-                // Background Glow - radiates from button center
+                // Background Glow - radiates from button center with pulse
                 Canvas(
-                    modifier = Modifier
-                        .size(220.dp)
-                        .graphicsLayer { alpha = glowScale }
+                    modifier = Modifier.size(220.dp)
                 ) {
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFF1B5E20).copy(alpha = 0.5f),
+                                Color(0xFF1B5E20).copy(alpha = bgGlowAlpha),
+                                Color(0xFF1B5E20).copy(alpha = bgGlowAlpha * 0.3f),
                                 Color.Transparent
                             ),
                             center = center,
-                            radius = 900f
+                            radius = 1000f
                         )
                     )
                 }
@@ -651,25 +662,20 @@ fun MainScreen(
             contentAlignment = Alignment.Center,
             label = "BottomContent"
         ) { running ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 if (running) {
                     val ip = getIPAddress()
                     val port = FTPServerService.PORT
                     val user = FTPServerService.USERNAME
                     val fullUrl = "ftp://$user:$password@$ip:$port"
 
-                    Text(
-                        text = "enter the ftp address in your file explorer",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MutedGrey,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Full FTP URL with credentials
+                    // Full FTP URL (Large, Green, Copyable)
                     Text(
                         text = fullUrl,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
                         color = NeonGreen,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -680,6 +686,33 @@ fun MainScreen(
                                 Toast.makeText(context, "copied to clipboard", Toast.LENGTH_SHORT).show()
                             }
                     )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Details Grid
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp)
+                    ) {
+                        // Row 1: IP | Port
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            DetailItem(label = "IP", value = ip)
+                            DetailItem(label = "Port", value = "$port")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        // Row 2: User | Pass
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            DetailItem(label = "User", value = user)
+                            DetailItem(label = "Pass", value = password)
+                        }
+                    }
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -698,5 +731,22 @@ fun MainScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DetailItem(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "$label: ",
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+            color = MutedGrey
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp),
+            color = Color.White,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
