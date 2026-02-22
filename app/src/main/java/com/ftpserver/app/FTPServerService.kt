@@ -1,0 +1,218 @@
+package com.ftpserver.app
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Binder
+import android.os.Build
+import android.os.Environment
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import org.apache.ftpserver.FtpServer
+import org.apache.ftpserver.FtpServerFactory
+import org.apache.ftpserver.ftplet.Authority
+import org.apache.ftpserver.ftplet.UserManager
+import org.apache.ftpserver.listener.ListenerFactory
+import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory
+import org.apache.ftpserver.usermanager.impl.BaseUser
+import org.apache.ftpserver.usermanager.impl.WritePermission
+import java.io.File
+import java.net.InetAddress
+import java.net.NetworkInterface
+
+class FTPServerService : Service() {
+    
+    private var ftpServer: FtpServer? = null
+    private val binder = LocalBinder()
+    private var isRunning = false
+    
+    companion object {
+        const val CHANNEL_ID = "FTPServerChannel"
+        const val NOTIFICATION_ID = 1
+        const val PORT = 2221
+        const val USERNAME = "android"
+        const val PASSWORD = "android123"
+        const val ACTION_STOP = "com.ftpserver.app.ACTION_STOP"
+    }
+    
+    private val stopReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_STOP) {
+                stopFTPServer()
+            }
+        }
+    }
+    
+    inner class LocalBinder : Binder() {
+        fun getService(): FTPServerService = this@FTPServerService
+    }
+    
+    override fun onBind(intent: Intent?): IBinder {
+        return binder
+    }
+    
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+        
+        // Register broadcast receiver for stop action
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(stopReceiver, IntentFilter(ACTION_STOP), Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(stopReceiver, IntentFilter(ACTION_STOP))
+        }
+    }
+    
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "FTP Server",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "FTP Server Running Status"
+                setShowBadge(true)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+    
+    private fun createNotification(): Notification {
+        // Intent to open MainActivity when notification is tapped
+        val notificationIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        // Intent to stop server
+        val stopIntent = Intent(ACTION_STOP)
+        val stopPendingIntent = PendingIntent.getBroadcast(
+            this,
+            1,
+            stopIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("FTP Server Running")
+            .setContentText("Tap to open • IP: ${getIPAddress()}:$PORT")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(pendingIntent)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "Stop",
+                stopPendingIntent
+            )
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(false)
+            .build()
+    }
+    
+    fun startFTPServer(): Boolean {
+        if (isRunning) return true
+        
+        try {
+            val serverFactory = FtpServerFactory()
+            
+            // Create listener
+            val listenerFactory = ListenerFactory()
+            listenerFactory.port = PORT
+            serverFactory.addListener("default", listenerFactory.createListener())
+            
+            // Create user manager
+            val userManagerFactory = PropertiesUserManagerFactory()
+            val userManager: UserManager = userManagerFactory.createUserManager()
+            
+            // Create user
+            val user = BaseUser()
+            user.name = USERNAME
+            user.password = PASSWORD
+            
+            // Set home directory to root of external storage (entire phone storage)
+            val homeDir = Environment.getExternalStorageDirectory()
+            user.homeDirectory = homeDir.absolutePath
+            
+            // Set permissions
+            val authorities = mutableListOf<Authority>()
+            authorities.add(WritePermission())
+            user.authorities = authorities
+            
+            userManager.save(user)
+            serverFactory.userManager = userManager
+            
+            // Create and start server
+            ftpServer = serverFactory.createServer()
+            ftpServer?.start()
+            
+            isRunning = true
+            startForeground(NOTIFICATION_ID, createNotification())
+            
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+    
+    fun stopFTPServer() {
+        if (!isRunning) return
+        
+        try {
+            ftpServer?.stop()
+            ftpServer = null
+            isRunning = false
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    fun isServerRunning(): Boolean = isRunning
+    
+    fun getIPAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val networkInterface = interfaces.nextElement()
+                val addresses = networkInterface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val address = addresses.nextElement()
+                    if (!address.isLoopbackAddress && address is java.net.Inet4Address) {
+                        return address.hostAddress ?: "Unknown"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return "Unknown"
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(stopReceiver)
+        } catch (e: Exception) {
+            // Receiver might not be registered
+        }
+        stopFTPServer()
+    }
+}
