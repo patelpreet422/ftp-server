@@ -25,20 +25,46 @@ import org.apache.ftpserver.usermanager.impl.WritePermission
 import java.io.File
 import java.net.InetAddress
 import java.net.NetworkInterface
+import kotlin.random.Random
 
 class FTPServerService : Service() {
     
     private var ftpServer: FtpServer? = null
     private val binder = LocalBinder()
     private var isRunning = false
+    private var currentPassword: String = generateRandomPassword()
     
     companion object {
         const val CHANNEL_ID = "FTPServerChannel"
         const val NOTIFICATION_ID = 1
         const val PORT = 2221
         const val USERNAME = "android"
-        const val PASSWORD = "android123"
         const val ACTION_STOP = "com.ftpserver.app.ACTION_STOP"
+        const val EXTRA_PASSWORD = "extra_password"
+        
+        fun generateRandomPassword(): String {
+            val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+            return (1..8).map { chars[Random.nextInt(chars.length)] }.joinToString("")
+        }
+        
+        fun getIPAddress(): String {
+            try {
+                val interfaces = NetworkInterface.getNetworkInterfaces()
+                while (interfaces.hasMoreElements()) {
+                    val networkInterface = interfaces.nextElement()
+                    val addresses = networkInterface.inetAddresses
+                    while (addresses.hasMoreElements()) {
+                        val address = addresses.nextElement()
+                        if (!address.isLoopbackAddress && address is java.net.Inet4Address) {
+                            return address.hostAddress ?: "unknown"
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            return "unknown"
+        }
     }
     
     private val stopReceiver = object : BroadcastReceiver() {
@@ -60,6 +86,13 @@ class FTPServerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopFTPServer()
+        } else {
+            // Check for password from intent
+            intent?.getStringExtra(EXTRA_PASSWORD)?.let {
+                if (!isRunning) {
+                    currentPassword = it
+                }
+            }
         }
         return START_STICKY
     }
@@ -134,8 +167,11 @@ class FTPServerService : Service() {
             .build()
     }
     
-    fun startFTPServer(): Boolean {
+    fun startFTPServer(password: String? = null): Boolean {
         if (isRunning) return true
+        
+        // Use provided password or generate new one
+        password?.let { currentPassword = it }
         
         try {
             val serverFactory = FtpServerFactory()
@@ -152,7 +188,7 @@ class FTPServerService : Service() {
             // Create user
             val user = BaseUser()
             user.name = USERNAME
-            user.password = PASSWORD
+            user.password = currentPassword
             
             // Set home directory to root of external storage (entire phone storage)
             val homeDir = Environment.getExternalStorageDirectory()
@@ -196,24 +232,15 @@ class FTPServerService : Service() {
     
     fun isServerRunning(): Boolean = isRunning
     
-    fun getIPAddress(): String {
-        try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val networkInterface = interfaces.nextElement()
-                val addresses = networkInterface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val address = addresses.nextElement()
-                    if (!address.isLoopbackAddress && address is java.net.Inet4Address) {
-                        return address.hostAddress ?: "Unknown"
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+    fun getPassword(): String = currentPassword
+    
+    fun regeneratePassword(): String {
+        if (!isRunning) {
+            currentPassword = generateRandomPassword()
         }
-        return "Unknown"
+        return currentPassword
     }
+    
     
     override fun onDestroy() {
         super.onDestroy()

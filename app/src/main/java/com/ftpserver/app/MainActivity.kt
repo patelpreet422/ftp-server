@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,132 +12,161 @@ import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColor
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.constraintlayout.compose.ConstraintLayout
-import androidx.constraintlayout.compose.Dimension
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
-// Google Sans Flex font loaded from local TTF file
+// Fonts
 val GoogleSansFlex = FontFamily(
     Font(R.font.google_sans_flex, FontWeight.Normal)
 )
 
+// Colors
+val NeonGreen = Color(0xFF99CC00)
+val DeepCharcoal = Color(0xFF1E1E1E)
+val SurfaceBlack = Color(0xFF121212)
+val MutedGrey = Color(0xFF808080)
+val NeonBlue = Color(0xFF00FFFF)
+val NeonYellow = Color(0xFFFFFF00)
+val NeonOrange = Color(0xFFFFA500)
+
 class MainActivity : ComponentActivity() {
-    
+
     private var ftpService: FTPServerService? = null
     private var bound = false
     
+    private lateinit var prefs: SharedPreferences
+    
+    companion object {
+        private const val PREFS_NAME = "ftp_server_prefs"
+        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
+    }
+
     private val storagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.all { it.value }) {
-            // Permissions granted, check for MANAGE_EXTERNAL_STORAGE
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 if (!Environment.isExternalStorageManager()) {
                     requestManageStoragePermission()
                 }
             }
         } else {
-            Toast.makeText(this, "Storage permissions required", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "storage permissions required", Toast.LENGTH_LONG).show()
         }
     }
-    
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (!isGranted) {
-            Toast.makeText(this, "Notification permission recommended for status updates", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "notification permission recommended", Toast.LENGTH_LONG).show()
         }
     }
-    
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as FTPServerService.LocalBinder
             ftpService = binder.getService()
             bound = true
         }
-        
+
         override fun onServiceDisconnected(name: ComponentName?) {
             ftpService = null
             bound = false
         }
     }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val onboardingCompleted = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+
         requestNotificationPermission()
         requestStoragePermissions()
-        
+
         setContent {
-            var isDarkTheme by remember { mutableStateOf(false) }
-            
-            FTPServerTheme(darkTheme = isDarkTheme) {
+            FTPServerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    FTPServerScreen(
-                        onStartServer = { startServer() },
+                    AppNavigation(
+                        startOnMain = onboardingCompleted,
+                        onOnboardingComplete = { markOnboardingCompleted() },
+                        onStartServer = { password -> startServer(password) },
                         onStopServer = { stopServer() },
                         getServerState = { ftpService?.isServerRunning() ?: false },
-                        getIPAddress = { ftpService?.getIPAddress() ?: "Unknown" },
-                        isDarkTheme = isDarkTheme,
-                        onToggleTheme = { isDarkTheme = !isDarkTheme }
+                        getIPAddress = { FTPServerService.getIPAddress() },
+                        getPassword = { ftpService?.getPassword() }
                     )
                 }
             }
         }
     }
     
+    private fun markOnboardingCompleted() {
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, true).apply()
+    }
+
     override fun onStart() {
         super.onStart()
         Intent(this, FTPServerService::class.java).also { intent ->
             bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
     }
-    
+
     override fun onStop() {
         super.onStop()
         if (bound) {
@@ -144,27 +174,29 @@ class MainActivity : ComponentActivity() {
             bound = false
         }
     }
-    
-    private fun startServer() {
-        val intent = Intent(this, FTPServerService::class.java)
+
+    private fun startServer(password: String) {
+        val intent = Intent(this, FTPServerService::class.java).apply {
+            putExtra(FTPServerService.EXTRA_PASSWORD, password)
+        }
         startService(intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        
+
         android.os.Handler(mainLooper).postDelayed({
-            ftpService?.startFTPServer()
+            ftpService?.startFTPServer(password)
         }, 100)
     }
-    
+
     private fun stopServer() {
         ftpService?.stopFTPServer()
     }
-    
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    
+
     private fun requestStoragePermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -179,7 +211,7 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-    
+
     private fun requestManageStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -188,7 +220,7 @@ class MainActivity : ComponentActivity() {
                 startActivity(intent)
                 Toast.makeText(
                     this,
-                    "Please allow 'All files access' permission",
+                    "please allow 'all files access' permission",
                     Toast.LENGTH_LONG
                 ).show()
             } catch (e: Exception) {
@@ -200,615 +232,471 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun FTPServerTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit
-) {
-    // Animated color transitions
-    val animationSpec = tween<Color>(durationMillis = 500, easing = FastOutSlowInEasing)
-    
-    val primary by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFF7A9D54) else Color(0xFF4C662B),
-        animationSpec = animationSpec,
-        label = "primary"
+fun FTPServerTheme(content: @Composable () -> Unit) {
+    val colorScheme = darkColorScheme(
+        primary = NeonGreen,
+        secondary = MutedGrey,
+        background = SurfaceBlack,
+        surface = DeepCharcoal,
+        onPrimary = Color.Black,
+        onSecondary = Color.White,
+        onBackground = Color.White,
+        onSurface = Color.White
     )
-    val secondary by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFFB5C99A) else Color(0xFF7A9D54),
-        animationSpec = animationSpec,
-        label = "secondary"
-    )
-    val tertiary by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFF4C662B) else Color(0xFFB5C99A),
-        animationSpec = animationSpec,
-        label = "tertiary"
-    )
-    val background by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFF1C1B1F) else Color(0xFFF9FAEF),
-        animationSpec = animationSpec,
-        label = "background"
-    )
-    val surface by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFF2C2C2C) else Color(0xFFFFFFFF),
-        animationSpec = animationSpec,
-        label = "surface"
-    )
-    val onBackground by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFFE6E1E5) else Color(0xFF1C1B1F),
-        animationSpec = animationSpec,
-        label = "onBackground"
-    )
-    val onSurface by animateColorAsState(
-        targetValue = if (darkTheme) Color(0xFFE6E1E5) else Color(0xFF1C1B1F),
-        animationSpec = animationSpec,
-        label = "onSurface"
-    )
-    
-    val colorScheme = if (darkTheme) {
-        darkColorScheme(
-            primary = primary,
-            secondary = secondary,
-            tertiary = tertiary,
-            background = background,
-            surface = surface,
-            onPrimary = Color.White,
-            onSecondary = Color(0xFF1C1B1F),
-            onBackground = onBackground,
-            onSurface = onSurface,
-        )
-    } else {
-        lightColorScheme(
-            primary = primary,
-            secondary = secondary,
-            tertiary = tertiary,
-            background = background,
-            surface = surface,
-            onPrimary = Color.White,
-            onSecondary = Color.White,
-            onBackground = onBackground,
-            onSurface = onSurface,
-        )
-    }
-    
+
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography(
+            displayLarge = TextStyle(
+                fontFamily = GoogleSansFlex,
+                fontWeight = FontWeight.Bold,
+                fontSize = 57.sp,
+                lineHeight = 64.sp,
+                letterSpacing = (-0.25).sp
+            ),
+            headlineMedium = TextStyle(
+                fontFamily = GoogleSansFlex,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 28.sp,
+                lineHeight = 36.sp,
+                letterSpacing = 0.sp
+            ),
+            bodyLarge = TextStyle(
+                fontFamily = GoogleSansFlex,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
+                letterSpacing = 0.5.sp
+            )
+        ),
         content = content
     )
 }
 
+enum class ScreenState {
+    Onboarding, Main
+}
+
 @Composable
-fun FTPServerScreen(
-    onStartServer: () -> Unit,
+fun AppNavigation(
+    startOnMain: Boolean,
+    onOnboardingComplete: () -> Unit,
+    onStartServer: (String) -> Unit,
     onStopServer: () -> Unit,
     getServerState: () -> Boolean,
     getIPAddress: () -> String,
-    isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    getPassword: () -> String?
 ) {
+    var currentScreen by remember { 
+        mutableStateOf(if (startOnMain) ScreenState.Main else ScreenState.Onboarding) 
+    }
     var isRunning by remember { mutableStateOf(false) }
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
-    val screenWidth = configuration.screenWidthDp.dp
     
-    // Dynamic sizing based on screen size
-    val titleSize = (screenWidth.value * 0.08f).coerceIn(24f, 36f).sp
-    val buttonSize = (screenHeight.value * 0.18f).coerceIn(120f, 160f).dp
-    val horizontalPadding = (screenWidth.value * 0.05f).coerceIn(16f, 24f).dp
-    val verticalPadding = (screenHeight.value * 0.03f).coerceIn(16f, 32f).dp
-    
+    // Password state: Initially empty, filled from service or on start
+    var password by remember { mutableStateOf("") }
+
     LaunchedEffect(Unit) {
         while (true) {
             isRunning = getServerState()
-            kotlinx.coroutines.delay(500)
+            // If server is running, get password from service
+            if (isRunning) {
+                getPassword()?.let { password = it }
+            }
+            delay(500)
         }
     }
-    
+
+    AnimatedVisibility(
+        visible = currentScreen == ScreenState.Onboarding,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        OnboardingScreen(onStart = { 
+            onOnboardingComplete()
+            currentScreen = ScreenState.Main 
+        })
+    }
+
+    AnimatedVisibility(
+        visible = currentScreen == ScreenState.Main,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        MainScreen(
+            isRunning = isRunning,
+            password = password,
+            onStartServer = {
+                // Generate new password when starting fresh
+                val newPassword = FTPServerService.generateRandomPassword()
+                password = newPassword
+                onStartServer(newPassword)
+            },
+            onStopServer = { onStopServer() },
+            getIPAddress = getIPAddress
+        )
+    }
+}
+
+@Composable
+fun OnboardingScreen(onStart: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
     ) {
+        // Decorative Rings
+        RingCluster(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 100.dp)
+        )
+
         Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Title and theme toggle row
-            Box(
+            Spacer(modifier = Modifier.height(180.dp)) // Space for rings
+
+            Text(
+                text = "ftp server",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color.White
+            )
+            
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = "transfer files via ftp server directly from your android device",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MutedGrey,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp).padding(bottom = 48.dp)
+            )
+
+            // Start Button
+            Button(
+                onClick = onStart,
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent
+                ),
+                contentPadding = PaddingValues(0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color(0xFF1B5E20), // Dark green
+                                NeonGreen.copy(alpha = 0.8f)
+                            )
+                        )
+                    )
             ) {
-                Text(
-                    text = "ftp server",
-                    fontSize = titleSize,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = GoogleSansFlex,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = (-0.5).sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                
-                IconButton(
-                    onClick = onToggleTheme,
-                    modifier = Modifier.align(Alignment.CenterEnd)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
+                    Text(
+                        text = "start",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 18.sp),
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = "Toggle theme",
-                        tint = MaterialTheme.colorScheme.primary
+                        imageVector = Icons.Rounded.ArrowForward,
+                        contentDescription = "Start",
+                        tint = Color.White
                     )
                 }
             }
-            
-            if (isRunning) {
-                // When server is running: button centered, details in scrollable area
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Dynamic button - centered
-                ServerButton(
-                    isRunning = isRunning,
-                    onStartServer = onStartServer,
-                    onStopServer = onStopServer,
-                    buttonSize = buttonSize
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Scrollable connection details card
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    CompactConnectionDetailsCard(
-                        ipAddress = getIPAddress(),
-                        port = FTPServerService.PORT.toString(),
-                        username = "android",
-                        password = "android123"
-                    )
-                }
-            } else {
-                // When server is stopped: button centered in full available space
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Dynamic button - centered
-                ServerButton(
-                    isRunning = isRunning,
-                    onStartServer = onStartServer,
-                    onStopServer = onStopServer,
-                    buttonSize = buttonSize
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-fun ServerButton(
+fun RingCluster(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "rings")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(20000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    Canvas(modifier = modifier.size(300.dp)) {
+        val center = Offset(size.width / 2, size.height / 2)
+        val radius = size.minDimension / 3
+
+        with(drawContext.canvas.nativeCanvas) {
+            val checkPoint = save()
+            
+            // Ring 1 - Neon Blue - Rotated
+            rotate(rotation, center.x, center.y)
+            drawCircle(
+                color = NeonBlue.copy(alpha = 0.6f),
+                radius = radius,
+                center = center.copy(x = center.x - 40f, y = center.y - 40f),
+                style = Stroke(width = 4f)
+            )
+            
+            // Ring 2 - Neon Yellow
+            rotate(120f, center.x, center.y)
+            drawCircle(
+                color = NeonYellow.copy(alpha = 0.6f),
+                radius = radius,
+                center = center.copy(x = center.x + 40f, y = center.y - 20f),
+                style = Stroke(width = 4f)
+            )
+
+            // Ring 3 - Neon Orange
+            rotate(120f, center.x, center.y)
+            drawCircle(
+                color = NeonOrange.copy(alpha = 0.6f),
+                radius = radius,
+                center = center.copy(x = center.x, y = center.y + 50f),
+                style = Stroke(width = 4f)
+            )
+            
+            restoreToCount(checkPoint)
+        }
+    }
+}
+
+@Composable
+fun MainScreen(
     isRunning: Boolean,
+    password: String,
     onStartServer: () -> Unit,
     onStopServer: () -> Unit,
-    buttonSize: Dp,
-    modifier: Modifier = Modifier
+    getIPAddress: () -> String
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val transition = updateTransition(targetState = isRunning, label = "ServerState")
     
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
+    val buttonColor by transition.animateColor(
+        label = "ButtonColor",
+        transitionSpec = { tween(durationMillis = 600) }
+    ) { state ->
+        if (state) NeonGreen else Color.DarkGray.copy(alpha = 0.3f)
+    }
+    
+    val iconColor by transition.animateColor(
+        label = "IconColor",
+        transitionSpec = { tween(durationMillis = 400) }
+    ) { state ->
+        if (state) Color.White else MutedGrey
+    }
+    
+    // Glow scale transition (0 to 1 when active)
+    val glowScale by transition.animateFloat(
+        label = "GlowScale",
+        transitionSpec = { tween(durationMillis = 800, easing = FastOutSlowInEasing) }
+    ) { state ->
+        if (state) 1f else 0f
+    }
+
+    // Glow Animation - Pulse (only visible when active)
+    val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
+    val glowPulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "scale"
+        label = "GlowPulseAlpha"
     )
     
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "alpha"
-    )
+    // Combined glow alpha (scale controls visibility, pulse adds effect)
+    val glowAlpha = glowScale * glowPulseAlpha
     
-    val ringSize = buttonSize + 20.dp
-    val textSize = (buttonSize.value * 0.17f).coerceIn(18f, 26f).sp
-    val subTextSize = (buttonSize.value * 0.085f).coerceIn(10f, 14f).sp
-    
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+
     Box(
-        modifier = Modifier.size(ringSize),
-        contentAlignment = Alignment.Center
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        if (isRunning) {
-            Canvas(modifier = Modifier.size(ringSize + 20.dp)) {
-                val center = Offset(size.width / 2, size.height / 2)
-                val baseRadius = (size.minDimension / 2) * 0.9f
-                val animatedRadius = baseRadius * scale
-                
-                // More visible ripple effect - red color matching the stop button
+        // Top Bar - Wifi Icon with Glow
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Wifi Glow Effect
+            Canvas(modifier = Modifier.size(60.dp)) {
                 drawCircle(
-                    color = Color(0xFFEF5350).copy(alpha = alpha * 2.5f),
-                    radius = animatedRadius,
-                    center = center,
-                    style = Stroke(width = 4f)
+                    color = NeonGreen.copy(alpha = glowAlpha * 0.6f),
+                    radius = (size.minDimension / 2) * glowScale
+                )
+            }
+            Icon(
+                imageVector = Icons.Rounded.Wifi,
+                contentDescription = "Wi-Fi",
+                tint = if (isRunning) NeonGreen else MutedGrey,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        // Center Content - Stable Position
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = (-40).dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Power Button with Background Glow
+            Box(contentAlignment = Alignment.Center) {
+                // Background Glow - radiates from button center
+                Canvas(
+                    modifier = Modifier
+                        .size(220.dp)
+                        .graphicsLayer { alpha = glowScale }
+                ) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF1B5E20).copy(alpha = 0.5f),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = 900f
+                        )
+                    )
+                }
+                
+                    // Glow Effect - Always rendered but scale/alpha animated
+                    Canvas(modifier = Modifier.size(220.dp)) {
+                        drawCircle(
+                            color = NeonGreen.copy(alpha = glowAlpha),
+                            radius = (size.minDimension / 2) * glowScale
+                        )
+                    }
+
+                FilledIconButton(
+                    onClick = { if (isRunning) onStopServer() else onStartServer() },
+                    modifier = Modifier
+                        .size(180.dp)
+                        .drawBehind {
+                            // Base (Disabled state)
+                            drawCircle(
+                                color = Color.DarkGray.copy(alpha = 0.3f)
+                            )
+                            // Active fill (expands from center)
+                            drawCircle(
+                                color = NeonGreen,
+                                radius = (size.minDimension / 2) * glowScale
+                            )
+                        },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = Color.Transparent
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PowerSettingsNew,
+                        contentDescription = "Power",
+                        tint = iconColor,
+                        modifier = Modifier.size(64.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Status Text with fade
+            AnimatedContent(
+                targetState = isRunning,
+                transitionSpec = {
+                    fadeIn(tween(600)) togetherWith fadeOut(tween(600))
+                },
+                label = "StatusText"
+            ) { running ->
+                Text(
+                    text = if (running) "active" else "disabled",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (running) Color.White else MutedGrey,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
         
-        Button(
-            onClick = { if (isRunning) onStopServer() else onStartServer() },
+        // Bottom Content - Scale + Fade Transition for depth effect
+        AnimatedContent(
+            targetState = isRunning,
             modifier = Modifier
-                .size(buttonSize)
-                .shadow(
-                    elevation = if (isRunning) 6.dp else 10.dp,
-                    shape = CircleShape,
-                    spotColor = if (isRunning) Color(0xFFEF5350).copy(alpha = 0.4f) 
-                              else Color(0xFF66BB6A).copy(alpha = 0.4f)
-                ),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isRunning) Color(0xFFEF5350) else Color(0xFF66BB6A)
-            ),
-            contentPadding = PaddingValues(0.dp),
-            shape = CircleShape
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = if (isRunning) "stop" else "start",
-                    fontSize = textSize,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = GoogleSansFlex,
-                    color = Color.White,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    text = "server",
-                    fontSize = subTextSize,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = GoogleSansFlex,
-                    color = Color.White.copy(alpha = 0.9f),
-                    letterSpacing = 1.5.sp
-                )
-            }
-        }
-    }
-}
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp),
+            transitionSpec = {
+                (fadeIn(tween(500)) + scaleIn(
+                    initialScale = 0.85f,
+                    animationSpec = tween(500)
+                )) togetherWith (fadeOut(tween(400)) + scaleOut(
+                    targetScale = 0.85f,
+                    animationSpec = tween(400)
+                ))
+            },
+            contentAlignment = Alignment.Center,
+            label = "BottomContent"
+        ) { running ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (running) {
+                    val ip = getIPAddress()
+                    val port = FTPServerService.PORT
+                    val user = FTPServerService.USERNAME
+                    val fullUrl = "ftp://$user:$password@$ip:$port"
 
-@Composable
-fun CompactStatusCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "server stopped",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = GoogleSansFlex,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "tap start to share files",
-                fontSize = 12.sp,
-                fontFamily = GoogleSansFlex,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-fun CompactConnectionDetailsCard(
-    ipAddress: String,
-    port: String,
-    username: String,
-    password: String,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "connection details",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = GoogleSansFlex,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CompactDetailItem(
-                    label = "ip",
-                    value = ipAddress,
-                    modifier = Modifier.weight(1f),
-                    onCopy = {
-                        clipboardManager.setText(AnnotatedString(ipAddress))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                    Text(
+                        text = "enter the ftp address in your file explorer",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MutedGrey,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Full FTP URL with credentials
+                    Text(
+                        text = fullUrl,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                        color = NeonGreen,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .clickable {
+                                clipboardManager.setText(AnnotatedString(fullUrl))
+                                Toast.makeText(context, "copied to clipboard", Toast.LENGTH_SHORT).show()
+                            }
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "network",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MutedGrey
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = getIPAddress(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                )
-                CompactDetailItem(
-                    label = "port",
-                    value = port,
-                    modifier = Modifier.weight(0.6f),
-                    onCopy = {
-                        clipboardManager.setText(AnnotatedString(port))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            }
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CompactDetailItem(
-                    label = "user",
-                    value = username,
-                    modifier = Modifier.weight(1f),
-                    onCopy = {
-                        clipboardManager.setText(AnnotatedString(username))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                    }
-                )
-                CompactDetailItem(
-                    label = "password",
-                    value = password,
-                    modifier = Modifier.weight(1f),
-                    onCopy = {
-                        clipboardManager.setText(AnnotatedString(password))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                    }
-                )
-            }
-            
-            val fullConnection = "ftp://$username:$password@$ipAddress:$port"
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(fullConnection))
-                    Toast.makeText(context, "full url copied", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(vertical = 10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy All",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "copy full url",
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = GoogleSansFlex,
-                    fontSize = 13.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun CompactDetailItem(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    onCopy: () -> Unit
-) {
-    Surface(
-        modifier = modifier.clickable(onClick = onCopy),
-        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp)
-        ) {
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                fontFamily = GoogleSansFlex,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = value,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = GoogleSansFlex,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
-fun ConnectionDetailsCard(
-    ipAddress: String,
-    port: String,
-    username: String,
-    password: String
-) {
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = "Connection Details",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = GoogleSansFlex,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            DetailItem(
-                label = "IP Address",
-                value = ipAddress,
-                onCopy = {
-                        clipboardManager.setText(AnnotatedString(ipAddress))
-                        Toast.makeText(context, "copied", Toast.LENGTH_SHORT).show()
                 }
-            )
-            
-            DetailItem(
-                label = "Port",
-                value = port,
-                onCopy = {
-                        clipboardManager.setText(AnnotatedString(port))
-                        Toast.makeText(context, "copied", Toast.LENGTH_SHORT).show()
-                }
-            )
-            
-            DetailItem(
-                label = "Username",
-                value = username,
-                onCopy = {
-                        clipboardManager.setText(AnnotatedString(username))
-                        Toast.makeText(context, "copied", Toast.LENGTH_SHORT).show()
-                }
-            )
-            
-            DetailItem(
-                label = "Password",
-                value = password,
-                onCopy = {
-                        clipboardManager.setText(AnnotatedString(password))
-                        Toast.makeText(context, "copied", Toast.LENGTH_SHORT).show()
-                }
-            )
-            
-            Spacer(modifier = Modifier.height(6.dp))
-            
-            val fullConnection = "ftp://$username:$password@$ipAddress:$port"
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(fullConnection))
-                    Toast.makeText(context, "Full URL copied", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(vertical = 14.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = "Copy All",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Copy Full URL",
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = GoogleSansFlex,
-                    fontSize = 15.sp
-                )
             }
-        }
-    }
-}
-
-@Composable
-fun DetailItem(label: String, value: String, onCopy: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onCopy),
-        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    fontFamily = GoogleSansFlex,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = value,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = GoogleSansFlex,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ContentCopy,
-                contentDescription = "Copy",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
