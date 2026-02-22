@@ -33,14 +33,16 @@ class FTPServerService : Service() {
     private val binder = LocalBinder()
     private var isRunning = false
     private var currentPassword: String = generateRandomPassword()
+    private var currentUsername: String = DEFAULT_USERNAME
     
     companion object {
         const val CHANNEL_ID = "FTPServerChannel"
         const val NOTIFICATION_ID = 1
         const val PORT = 2221
-        const val USERNAME = "android"
+        const val DEFAULT_USERNAME = "android"
         const val ACTION_STOP = "com.ftpserver.app.ACTION_STOP"
         const val EXTRA_PASSWORD = "extra_password"
+        const val EXTRA_USERNAME = "extra_username"
         
         fun generateRandomPassword(): String {
             val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
@@ -131,10 +133,13 @@ class FTPServerService : Service() {
         if (intent?.action == ACTION_STOP) {
             stopFTPServer()
         } else {
-            // Check for password from intent
-            intent?.getStringExtra(EXTRA_PASSWORD)?.let {
-                if (!isRunning) {
+            // Check for credentials from intent
+            if (!isRunning) {
+                intent?.getStringExtra(EXTRA_PASSWORD)?.let {
                     currentPassword = it
+                }
+                intent?.getStringExtra(EXTRA_USERNAME)?.let {
+                    currentUsername = it
                 }
             }
         }
@@ -211,10 +216,11 @@ class FTPServerService : Service() {
             .build()
     }
     
-    fun startFTPServer(password: String? = null): Boolean {
+    fun startFTPServer(username: String? = null, password: String? = null): Boolean {
         if (isRunning) return true
         
-        // Use provided password or generate new one
+        // Use provided credentials or defaults
+        username?.let { currentUsername = it }
         password?.let { currentPassword = it }
         
         try {
@@ -231,7 +237,7 @@ class FTPServerService : Service() {
             
             // Create user
             val user = BaseUser()
-            user.name = USERNAME
+            user.name = currentUsername
             user.password = currentPassword
             
             // Set home directory to root of external storage (entire phone storage)
@@ -277,6 +283,8 @@ class FTPServerService : Service() {
     fun isServerRunning(): Boolean = isRunning
     
     fun getPassword(): String = currentPassword
+    
+    fun getUsername(): String = currentUsername
     
     fun regeneratePassword(): String {
         if (!isRunning) {

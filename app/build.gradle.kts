@@ -94,6 +94,9 @@ dependencies {
     implementation("org.apache.ftpserver:ftpserver-core:1.2.0")
     implementation("org.slf4j:slf4j-android:1.7.36")
     
+    // Dynamic Material Theme
+    implementation("com.materialkolor:material-kolor:2.0.0")
+    
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
