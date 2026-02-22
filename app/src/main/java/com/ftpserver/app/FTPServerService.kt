@@ -57,6 +57,13 @@ class FTPServerService : Service() {
         return binder
     }
     
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopFTPServer()
+        }
+        return START_STICKY
+    }
+    
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -98,9 +105,11 @@ class FTPServerService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
-        // Intent to stop server
-        val stopIntent = Intent(ACTION_STOP)
-        val stopPendingIntent = PendingIntent.getBroadcast(
+        // Intent to stop server - use Service intent directly
+        val stopIntent = Intent(this, FTPServerService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
             this,
             1,
             stopIntent,
