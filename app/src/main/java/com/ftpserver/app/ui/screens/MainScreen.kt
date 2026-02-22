@@ -106,18 +106,18 @@ fun MainScreen(
                 .fillMaxWidth()
                 .padding(
                     top = statusBarPadding.calculateTopPadding() + 8.dp,
-                    start = 16.dp,
-                    end = 16.dp
+                    start = 12.dp,
+                    end = 12.dp
                 ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.size(60.dp))
+            Spacer(modifier = Modifier.size(48.dp))
 
             // Wifi Icon with Glow
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(60.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(
@@ -136,13 +136,13 @@ fun MainScreen(
             // Settings Button
             IconButton(
                 onClick = onSettingsClick,
-                modifier = Modifier.size(60.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }

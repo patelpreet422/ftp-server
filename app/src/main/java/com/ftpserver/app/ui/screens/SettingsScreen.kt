@@ -57,37 +57,38 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 12.dp)
     ) {
         // Header
         item {
             Spacer(modifier = Modifier.height(statusBarPadding.calculateTopPadding() + 8.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.height(60.dp)
+                modifier = Modifier.height(48.dp)
             ) {
                 IconButton(
                     onClick = onBackClick,
-                    modifier = Modifier.size(60.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = "Back",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(60.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Settings,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "settings",
                     style = MaterialTheme.typography.headlineMedium,
@@ -232,22 +233,22 @@ private fun SettingsSectionHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onToggle() }
-                .padding(vertical = 16.dp)
+                .padding(vertical = 16.dp, horizontal = 12.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = title.lowercase(),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
+            Spacer(modifier = Modifier.width(24.dp))
+            Text(
+                text = title.lowercase(),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
             Icon(
                 imageVector = Icons.Rounded.KeyboardArrowDown,
                 contentDescription = if (isExpanded) "Collapse" else "Expand",
