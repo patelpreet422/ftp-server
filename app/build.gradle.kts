@@ -99,6 +99,9 @@ dependencies {
     // Dynamic Material Theme
     implementation("com.materialkolor:material-kolor:2.0.0")
     
+    // QR Code generation
+    implementation("com.google.zxing:core:3.5.2")
+    
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
