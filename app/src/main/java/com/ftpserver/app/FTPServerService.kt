@@ -49,17 +49,61 @@ class FTPServerService : Service() {
         
         fun getIPAddress(): String {
             try {
+                data class CandidateAddress(
+                    val ip: String,
+                    val interfaceName: String,
+                    val priority: Int
+                )
+                
+                val candidates = mutableListOf<CandidateAddress>()
                 val interfaces = NetworkInterface.getNetworkInterfaces()
+                
                 while (interfaces.hasMoreElements()) {
                     val networkInterface = interfaces.nextElement()
+                    if (!networkInterface.isUp) continue
+                    
+                    val interfaceName = networkInterface.name.lowercase()
                     val addresses = networkInterface.inetAddresses
+                    
                     while (addresses.hasMoreElements()) {
                         val address = addresses.nextElement()
-                        if (!address.isLoopbackAddress && address is java.net.Inet4Address) {
-                            return address.hostAddress ?: "unknown"
+                        if (address.isLoopbackAddress || address !is java.net.Inet4Address) continue
+                        
+                        val ip = address.hostAddress ?: continue
+                        val ipParts = ip.split(".").mapNotNull { it.toIntOrNull() }
+                        if (ipParts.size != 4) continue
+                        
+                        // Calculate priority (higher = better)
+                        var priority = 0
+                        
+                        // Prioritize by interface name
+                        when {
+                            interfaceName.startsWith("wlan") -> priority += 100  // Wi-Fi
+                            interfaceName.startsWith("eth") -> priority += 90    // Ethernet
+                            interfaceName.startsWith("ap") -> priority += 80     // Hotspot
+                            interfaceName.startsWith("usb") -> priority += 70    // USB tethering
+                            interfaceName.startsWith("rmnet") -> priority += 10  // Mobile data
+                            interfaceName.startsWith("tun") -> priority += 5     // VPN
                         }
+                        
+                        // Prioritize by IP range (private networks preferred)
+                        when {
+                            // 192.168.x.x - Common home/office Wi-Fi
+                            ipParts[0] == 192 && ipParts[1] == 168 -> priority += 50
+                            // 10.x.x.x - Private network
+                            ipParts[0] == 10 -> priority += 45
+                            // 172.16.x.x - 172.31.x.x - Private network
+                            ipParts[0] == 172 && ipParts[1] in 16..31 -> priority += 40
+                            // 100.64.x.x - 100.127.x.x - Carrier-Grade NAT (avoid)
+                            ipParts[0] == 100 && ipParts[1] in 64..127 -> priority += 1
+                        }
+                        
+                        candidates.add(CandidateAddress(ip, interfaceName, priority))
                     }
                 }
+                
+                // Return highest priority IP, or "unknown" if none found
+                return candidates.maxByOrNull { it.priority }?.ip ?: "unknown"
             } catch (e: Exception) {
                 e.printStackTrace()
             }
