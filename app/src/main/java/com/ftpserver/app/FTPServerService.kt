@@ -1,9 +1,5 @@
 package com.ftpserver.app
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -13,7 +9,6 @@ import android.os.Binder
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
@@ -22,33 +17,28 @@ import org.apache.ftpserver.listener.ListenerFactory
 import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory
 import org.apache.ftpserver.usermanager.impl.BaseUser
 import org.apache.ftpserver.usermanager.impl.WritePermission
-import java.io.File
-import java.net.InetAddress
-import java.net.NetworkInterface
 import kotlin.random.Random
 
 class FTPServerService : Service() {
-    
+
     private var ftpServer: FtpServer? = null
     private val binder = LocalBinder()
     private var isRunning = false
     private var currentPassword: String = generateRandomPassword()
     private var currentUsername: String = DEFAULT_USERNAME
-    
+
     companion object {
-        const val CHANNEL_ID = "FTPServerChannel"
-        const val NOTIFICATION_ID = 1
         const val PORT = 2221
         const val DEFAULT_USERNAME = "android"
         const val ACTION_STOP = "com.ftpserver.app.ACTION_STOP"
         const val EXTRA_PASSWORD = "extra_password"
         const val EXTRA_USERNAME = "extra_username"
-        
+
         fun generateRandomPassword(): String {
             val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
             return (1..8).map { chars[Random.nextInt(chars.length)] }.joinToString("")
         }
-        
+
         fun getIPAddress(): String {
             try {
                 data class CandidateAddress(
@@ -56,55 +46,47 @@ class FTPServerService : Service() {
                     val interfaceName: String,
                     val priority: Int
                 )
-                
+
                 val candidates = mutableListOf<CandidateAddress>()
-                val interfaces = NetworkInterface.getNetworkInterfaces()
-                
+                val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+
                 while (interfaces.hasMoreElements()) {
                     val networkInterface = interfaces.nextElement()
                     if (!networkInterface.isUp) continue
-                    
+
                     val interfaceName = networkInterface.name.lowercase()
                     val addresses = networkInterface.inetAddresses
-                    
+
                     while (addresses.hasMoreElements()) {
                         val address = addresses.nextElement()
                         if (address.isLoopbackAddress || address !is java.net.Inet4Address) continue
-                        
+
                         val ip = address.hostAddress ?: continue
                         val ipParts = ip.split(".").mapNotNull { it.toIntOrNull() }
                         if (ipParts.size != 4) continue
-                        
-                        // Calculate priority (higher = better)
+
                         var priority = 0
-                        
-                        // Prioritize by interface name
+
                         when {
-                            interfaceName.startsWith("wlan") -> priority += 100  // Wi-Fi
-                            interfaceName.startsWith("eth") -> priority += 90    // Ethernet
-                            interfaceName.startsWith("ap") -> priority += 80     // Hotspot
-                            interfaceName.startsWith("usb") -> priority += 70    // USB tethering
-                            interfaceName.startsWith("rmnet") -> priority += 10  // Mobile data
-                            interfaceName.startsWith("tun") -> priority += 5     // VPN
+                            interfaceName.startsWith("wlan") -> priority += 100
+                            interfaceName.startsWith("eth") -> priority += 90
+                            interfaceName.startsWith("ap") -> priority += 80
+                            interfaceName.startsWith("usb") -> priority += 70
+                            interfaceName.startsWith("rmnet") -> priority += 10
+                            interfaceName.startsWith("tun") -> priority += 5
                         }
-                        
-                        // Prioritize by IP range (private networks preferred)
+
                         when {
-                            // 192.168.x.x - Common home/office Wi-Fi
                             ipParts[0] == 192 && ipParts[1] == 168 -> priority += 50
-                            // 10.x.x.x - Private network
                             ipParts[0] == 10 -> priority += 45
-                            // 172.16.x.x - 172.31.x.x - Private network
                             ipParts[0] == 172 && ipParts[1] in 16..31 -> priority += 40
-                            // 100.64.x.x - 100.127.x.x - Carrier-Grade NAT (avoid)
                             ipParts[0] == 100 && ipParts[1] in 64..127 -> priority += 1
                         }
-                        
+
                         candidates.add(CandidateAddress(ip, interfaceName, priority))
                     }
                 }
-                
-                // Return highest priority IP, or "unknown" if none found
+
                 return candidates.maxByOrNull { it.priority }?.ip ?: "unknown"
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -112,7 +94,7 @@ class FTPServerService : Service() {
             return "unknown"
         }
     }
-    
+
     private val stopReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == ACTION_STOP) {
@@ -120,20 +102,19 @@ class FTPServerService : Service() {
             }
         }
     }
-    
+
     inner class LocalBinder : Binder() {
         fun getService(): FTPServerService = this@FTPServerService
     }
-    
+
     override fun onBind(intent: Intent?): IBinder {
         return binder
     }
-    
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopFTPServer()
         } else {
-            // Check for credentials from intent
             if (!isRunning) {
                 intent?.getStringExtra(EXTRA_PASSWORD)?.let {
                     currentPassword = it
@@ -145,155 +126,84 @@ class FTPServerService : Service() {
         }
         return START_STICKY
     }
-    
+
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        
-        // Register broadcast receiver for stop action
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(stopReceiver, IntentFilter(ACTION_STOP), Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(stopReceiver, IntentFilter(ACTION_STOP))
         }
     }
-    
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "FTP Server",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "FTP Server Running Status"
-                setShowBadge(true)
-                enableVibration(false)
-                setSound(null, null)
-            }
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-    
-    private fun createNotification(): Notification {
-        // Intent to open MainActivity when notification is tapped
-        val notificationIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        
-        // Intent to stop server - use Service intent directly
-        val stopIntent = Intent(this, FTPServerService::class.java).apply {
-            action = ACTION_STOP
-        }
-        val stopPendingIntent = PendingIntent.getService(
-            this,
-            1,
-            stopIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("FTP Server Running")
-            .setContentText("Tap to open • IP: ${getIPAddress()}:$PORT")
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentIntent(pendingIntent)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Stop",
-                stopPendingIntent
-            )
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(false)
-            .build()
-    }
-    
+
     fun startFTPServer(username: String? = null, password: String? = null): Boolean {
         if (isRunning) return true
-        
-        // Use provided credentials or defaults
+
         username?.let { currentUsername = it }
         password?.let { currentPassword = it }
-        
+
         try {
             val serverFactory = FtpServerFactory()
-            
-            // Create listener
+
             val listenerFactory = ListenerFactory()
             listenerFactory.port = PORT
             serverFactory.addListener("default", listenerFactory.createListener())
-            
-            // Create user manager
+
             val userManagerFactory = PropertiesUserManagerFactory()
             val userManager: UserManager = userManagerFactory.createUserManager()
-            
-            // Create user
+
             val user = BaseUser()
             user.name = currentUsername
             user.password = currentPassword
-            
-            // Set home directory to root of external storage (entire phone storage)
+
             val homeDir = Environment.getExternalStorageDirectory()
             user.homeDirectory = homeDir.absolutePath
-            
-            // Set permissions
+
             val authorities = mutableListOf<Authority>()
             authorities.add(WritePermission())
             user.authorities = authorities
-            
+
             userManager.save(user)
             serverFactory.userManager = userManager
-            
-            // Create and start server
+
             ftpServer = serverFactory.createServer()
             ftpServer?.start()
-            
+
             isRunning = true
-            startForeground(NOTIFICATION_ID, createNotification())
-            
             return true
         } catch (e: Exception) {
             e.printStackTrace()
             return false
         }
     }
-    
+
     fun stopFTPServer() {
         if (!isRunning) return
-        
+
         try {
             ftpServer?.stop()
             ftpServer = null
             isRunning = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-    
+
     fun isServerRunning(): Boolean = isRunning
-    
+
     fun getPassword(): String = currentPassword
-    
+
     fun getUsername(): String = currentUsername
-    
+
     fun regeneratePassword(): String {
         if (!isRunning) {
             currentPassword = generateRandomPassword()
         }
         return currentPassword
     }
-    
-    
+
     override fun onDestroy() {
         super.onDestroy()
         try {
