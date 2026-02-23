@@ -19,12 +19,10 @@ plugins {
     //   - Code shrinking via R8/ProGuard
     //   - APK signing
     // Version (9.0.1) is inherited from root build.gradle.kts.
+    //
+    // NOTE: Kotlin compilation is handled by AGP's built-in Kotlin support
+    // (android.builtInKotlin=true), so a separate kotlin.android plugin is NOT needed.
     id("com.android.application")
-
-    // Applies the Kotlin Android plugin to compile .kt source files.
-    // Enables Kotlin language features and configures JVM target compatibility.
-    // Version (2.2.10) is inherited from root build.gradle.kts.
-    id("org.jetbrains.kotlin.android")
 
     // Applies the Compose Compiler plugin which transforms @Composable functions
     // into optimized runtime code for Jetpack Compose UI framework.
@@ -85,31 +83,11 @@ android {
         }
     }
 
-    // Custom APK naming: outputs "ftp-server-v1.1.0.apk" (release) or
-    // "ftp-server-v1.1.0-debug.apk" (debug) instead of the default "app-debug.apk".
-    applicationVariants.all {
-        outputs.all {
-            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            val variantName = name
-            val versionName = android.defaultConfig.versionName
-            val versionCode = android.defaultConfig.versionCode
-
-            outputImpl.outputFileName = if (variantName.contains("release")) {
-                "ftp-server-v${versionName}.apk"
-            } else {
-                "ftp-server-v${versionName}-debug.apk"
-            }
-        }
-    }
-
     // Java compatibility settings for the compiled bytecode.
     // Using Java 8 bytecode target for maximum Android device compatibility.
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
     }
 
     buildFeatures {
@@ -129,6 +107,24 @@ android {
             excludes += "/META-INF/NOTICE.txt"
         }
     }
+}
+
+// Configure Kotlin JVM target for all Kotlin compilation tasks.
+// This replaces the legacy `android { kotlinOptions { jvmTarget = "1.8" } }` syntax
+// which is not supported in the new AGP DSL.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+    }
+}
+
+// Custom APK naming: outputs "ftp-server-v1.1.0-release.apk" and
+// "ftp-server-v1.1.0-debug.apk" instead of the default "app-release.apk".
+//
+// Uses the standard Gradle base plugin archivesName property. AGP appends the
+// build type suffix (-release, -debug) automatically following Gradle conventions.
+base {
+    archivesName = "ftp-server-v${android.defaultConfig.versionName}"
 }
 
 dependencies {

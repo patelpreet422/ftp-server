@@ -40,12 +40,6 @@ plugins {
     // Docs: https://developer.android.com/build
     id("com.android.application") version "9.0.1" apply false
 
-    // Kotlin Android Plugin — adds Kotlin language support to the Android build.
-    // Compiles .kt files, configures Kotlin-specific options (jvmTarget, etc.),
-    // and integrates with the Android build pipeline.
-    // Docs: https://kotlinlang.org/docs/gradle-configure-project.html
-    id("org.jetbrains.kotlin.android") version "2.2.10" apply false
-
     // Compose Compiler Plugin — transforms @Composable functions into the
     // underlying code that the Jetpack Compose runtime can execute.
     // Since Kotlin 2.0, this is a standalone plugin (no longer bundled in the
