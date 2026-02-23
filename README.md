@@ -30,50 +30,150 @@ The app features:
 - **Root Directory**: App's external files directory (`/ftp_root`)
 
 ### Technologies Used
-- **Language**: Kotlin
-- **UI Framework**: Jetpack Compose with Material 3
+- **Language**: Kotlin 2.2.10
+- **UI Framework**: Jetpack Compose with Material 3 (Compose Compiler Plugin: `org.jetbrains.kotlin.plugin.compose`)
 - **FTP Library**: Apache FTPServer 1.2.0
+- **Android Gradle Plugin**: 9.0.1
 - **Minimum SDK**: 24 (Android 7.0)
 - **Target SDK**: 34 (Android 14)
+- **Compile SDK**: 34
 
-## Building the Project
+### Build Runtime Versions
 
-### Prerequisites
-- Android Studio (latest version recommended)
-- JDK 8 or higher
-- Android SDK with API level 34
-- Gradle 8.2 or higher (included via wrapper)
+| Component | Version | Managed By |
+|---|---|---|
+| **Java (JDK)** | Adoptium (Eclipse Temurin) 21 | Auto-downloaded by Gradle via [Foojay Toolchain Resolver](https://github.com/gradle/foojay-toolchains) (`gradle/gradle-daemon-jvm.properties`) |
+| **Gradle** | 9.2.1 | Auto-downloaded by the [Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html) (`gradle/wrapper/gradle-wrapper.properties`) |
+| **Android SDK** | API 34 (Build Tools 34.x) | Must be installed manually (see setup below) |
+| **Kotlin** | 2.2.10 | Managed by Gradle plugin (`build.gradle.kts`) |
+| **AGP** | 9.0.1 | Managed by Gradle plugin (`build.gradle.kts`) |
 
-### Build Steps
+> **Note:** You do **not** need to install Java or Gradle manually. The project is configured to automatically download exact pinned versions of both. Only the Android SDK requires manual setup.
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/patelpreet422/ftp-server.git
-   cd ftp-server
-   ```
+---
 
-2. **Build using Gradle**:
-   ```bash
-   ./gradlew assembleDebug
-   ```
+## 🛠 Development Setup (CLI / VS Code)
 
-3. **Install on device**:
-   ```bash
-   ./gradlew installDebug
-   ```
+This guide gets you from a bare machine to a running build using only the command line. No Android Studio required.
 
-4. **Or open in Android Studio**:
-   - Open Android Studio
-   - Select "Open an Existing Project"
-   - Navigate to the project directory
-   - Click "OK"
-   - Wait for Gradle sync to complete
-   - Click the Run button or press Shift+F10
+### Step 1: Install Android SDK Command Line Tools
+
+1.  **Download** the "Command line tools only" package for your OS from the official Android developer site:
+    [https://developer.android.com/studio#command-line-tools-only](https://developer.android.com/studio#command-line-tools-only)
+
+2.  **Create a directory** for the Android SDK and extract the tools into it:
+
+    ```bash
+    # macOS / Linux
+    mkdir -p ~/android-sdk/cmdline-tools
+    unzip commandlinetools-*.zip -d ~/android-sdk/cmdline-tools
+    mv ~/android-sdk/cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
+    ```
+
+    ```powershell
+    # Windows (PowerShell)
+    mkdir $env:USERPROFILE\android-sdk\cmdline-tools
+    Expand-Archive commandlinetools-*.zip -DestinationPath $env:USERPROFILE\android-sdk\cmdline-tools
+    Rename-Item $env:USERPROFILE\android-sdk\cmdline-tools\cmdline-tools latest
+    ```
+
+3.  **Set the `ANDROID_HOME` environment variable** and add tools to your `PATH`:
+
+    ```bash
+    # macOS / Linux — add to ~/.zshrc, ~/.bashrc, or ~/.profile
+    export ANDROID_HOME="$HOME/android-sdk"
+    export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+    ```
+
+    ```powershell
+    # Windows (PowerShell) — run once, or add to your profile
+    [System.Environment]::SetEnvironmentVariable("ANDROID_HOME", "$env:USERPROFILE\android-sdk", "User")
+    $env:ANDROID_HOME = "$env:USERPROFILE\android-sdk"
+    $env:PATH = "$env:ANDROID_HOME\cmdline-tools\latest\bin;$env:ANDROID_HOME\platform-tools;$env:PATH"
+    ```
+
+4.  **Reload your shell** (or open a new terminal) and verify:
+    ```bash
+    sdkmanager --version
+    ```
+
+### Step 2: Install Required SDK Packages
+
+Accept the licenses and install the platform and build tools needed by this project:
+
+```bash
+sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+sdkmanager --licenses   # Accept all licenses when prompted
+```
+
+### Step 3: Clone the Repository
+
+```bash
+git clone https://github.com/patelpreet422/ftp-server.git
+cd ftp-server
+```
+
+### Step 4: Build the Project
+
+```bash
+./gradlew assembleDebug
+```
+
+**What happens automatically on first run:**
+1.  The **Gradle Wrapper** (`gradlew`) downloads **Gradle 9.2.1** (defined in `gradle/wrapper/gradle-wrapper.properties`).
+2.  Gradle reads `gradle/gradle-daemon-jvm.properties` and the **Foojay Toolchain Resolver** automatically downloads **Adoptium JDK 21** for your OS/architecture.
+3.  Gradle syncs the project and compiles the app.
+
+You do **not** need to install Java or Gradle yourself. Everything is pinned and reproducible.
+
+### Step 5: Install & Run on a Device
+
+1.  **Connect** an Android device via USB (with USB Debugging enabled) or start an emulator.
+
+2.  **Verify** the device is detected:
+    ```bash
+    adb devices
+    ```
+
+3.  **Install** the debug APK:
+    ```bash
+    ./gradlew installDebug
+    ```
+
+4.  **Launch** the app from the device, or via adb:
+    ```bash
+    adb shell am start -n com.ftpserver.app/.MainActivity
+    ```
 
 ### Build Outputs
-The APK files will be generated in:
-- Debug: `app/build/outputs/apk/debug/app-debug.apk`
-- Release: `app/build/outputs/apk/release/app-release.apk`
+
+| Variant | Path |
+|---|---|
+| Debug | `app/build/outputs/apk/debug/ftp-server-v1.0-debug.apk` |
+| Release | `app/build/outputs/apk/release/ftp-server-v1.0.apk` |
+
+### Optional: VS Code Setup
+
+For a comfortable editing experience without Android Studio:
+- Install the [Kotlin](https://marketplace.visualstudio.com/items?itemName=mathiasfrohlich.Kotlin) language extension.
+- Install [Gradle for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-gradle) for task running and dependency management.
+
+---
+
+<details>
+<summary><strong>Alternative: Android Studio Setup</strong></summary>
+
+If you prefer using Android Studio:
+
+1. Open Android Studio.
+2. Select **"Open an Existing Project"**.
+3. Navigate to the cloned `ftp-server` directory and click **"OK"**.
+4. Wait for Gradle sync to complete (Java and Gradle are downloaded automatically).
+5. Click the **Run** button or press **Shift+F10**.
+
+</details>
+
+---
 
 ## How to Use
 
@@ -109,7 +209,8 @@ ftp-server/
 │   │   └── main/
 │   │       ├── java/com/ftpserver/app/
 │   │       │   ├── MainActivity.kt          # Main UI with Compose
-│   │       │   └── FTPServerService.kt      # FTP server service
+│   │       │   ├── FTPServerService.kt      # FTP server service
+│   │       │   └── ui/screens/              # Compose screens
 │   │       ├── res/
 │   │       │   ├── values/
 │   │       │   │   ├── strings.xml
@@ -117,9 +218,14 @@ ftp-server/
 │   │       │   │   └── colors.xml
 │   │       │   └── drawable/
 │   │       └── AndroidManifest.xml
-│   └── build.gradle.kts
-├── build.gradle.kts
-├── settings.gradle.kts
+│   └── build.gradle.kts                     # App-level build config
+├── build.gradle.kts                         # Root build config (AGP + Kotlin versions)
+├── settings.gradle.kts                      # Foojay plugin & repository config
+├── gradle.properties                        # Android build flags
+├── gradle/
+│   ├── gradle-daemon-jvm.properties         # Pinned JDK version (Adoptium 21)
+│   └── wrapper/
+│       └── gradle-wrapper.properties        # Pinned Gradle version (9.2.1)
 └── README.md
 ```
 
@@ -145,7 +251,7 @@ companion object {
 ```
 
 ### Modify UI Colors
-Edit `MainActivity.kt` in the `FTPServerTheme` composable to customize colors.
+Edit the theme files in `app/src/main/java/com/ftpserver/app/ui/theme/` to customize colors.
 
 ## Troubleshooting
 
@@ -164,6 +270,11 @@ Edit `MainActivity.kt` in the `FTPServerTheme` composable to customize colors.
 - The FTP root is located in the app's external storage
 - Files are stored in `/Android/data/com.ftpserver.app/files/ftp_root/`
 - The user has full read/write permissions by default
+
+### Build fails on first run
+- Ensure `ANDROID_HOME` is set correctly: `echo $ANDROID_HOME`
+- Verify SDK packages are installed: `sdkmanager --list_installed`
+- Check your internet connection (Gradle and JDK are downloaded on first build)
 
 ## Security Notes
 
