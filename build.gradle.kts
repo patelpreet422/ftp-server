@@ -37,6 +37,8 @@ plugins {
     // Android Gradle Plugin (AGP) — the core plugin that knows how to compile
     // Android resources, merge manifests, run R8/ProGuard, sign APKs, and
     // package everything into an .apk or .aab file.
+    // AGP 9.0+ includes built-in Kotlin support (bundles Kotlin 2.2.10),
+    // so a separate org.jetbrains.kotlin.android plugin is not needed.
     // Docs: https://developer.android.com/build
     id("com.android.application") version "9.0.1" apply false
 
@@ -44,6 +46,13 @@ plugins {
     // underlying code that the Jetpack Compose runtime can execute.
     // Since Kotlin 2.0, this is a standalone plugin (no longer bundled in the
     // Kotlin compiler), allowing independent version management.
+    //
+    // NOTE: This plugin version must match the Kotlin compiler version bundled
+    // by AGP. AGP 9.0.1 bundles Kotlin 2.2.10, so the Compose Compiler plugin
+    // must also be 2.2.10. The Kotlin compiler version is controlled by AGP's
+    // built-in Kotlin support — changing this plugin version alone does NOT
+    // change the Kotlin compiler used for compilation.
+    //
     // Docs: https://developer.android.com/develop/ui/compose/compiler
     id("org.jetbrains.kotlin.plugin.compose") version "2.2.10" apply false
 }

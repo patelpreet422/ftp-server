@@ -45,7 +45,7 @@ The app features:
 | **Java (JDK)** | Adoptium (Eclipse Temurin) 21 | Auto-downloaded by Gradle via [Foojay Toolchain Resolver](https://github.com/gradle/foojay-toolchains) (`gradle/gradle-daemon-jvm.properties`) |
 | **Gradle** | 9.2.1 | Auto-downloaded by the [Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html) (`gradle/wrapper/gradle-wrapper.properties`) |
 | **Android SDK** | API 34 (Build Tools 34.x) | Must be installed manually (see setup below) |
-| **Kotlin** | 2.2.10 | Managed by Gradle plugin (`build.gradle.kts`) |
+| **Kotlin** | 2.2.10 | Bundled by AGP 9.0.1 (built-in Kotlin support) |
 | **AGP** | 9.0.1 | Managed by Gradle plugin (`build.gradle.kts`) |
 
 > **Note:** You do **not** need to install Java or Gradle manually. The project is configured to automatically download exact pinned versions of both. Only the Android SDK requires manual setup.
