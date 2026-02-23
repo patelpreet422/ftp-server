@@ -1,21 +1,55 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# =============================================================================
+# ProGuard / R8 rules for FTP Server app
+# =============================================================================
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# For more details, see:
+#   https://developer.android.com/build/shrink-code
+#   https://www.guardsquare.com/manual/configuration/usage
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# -----------------------------------------------------------------------------
+# Debugging: preserve source file names and line numbers in stack traces
+# -----------------------------------------------------------------------------
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# -----------------------------------------------------------------------------
+# Apache FTPServer & MINA
+# -----------------------------------------------------------------------------
+# FTPServer uses reflection for user management and command factories.
+# MINA (the underlying NIO framework) uses reflection for session management.
+-keep class org.apache.ftpserver.** { *; }
+-keep class org.apache.mina.** { *; }
+-dontwarn org.apache.ftpserver.**
+-dontwarn org.apache.mina.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# -----------------------------------------------------------------------------
+# SLF4J logging
+# -----------------------------------------------------------------------------
+-dontwarn org.slf4j.**
+-keep class org.slf4j.** { *; }
+
+# -----------------------------------------------------------------------------
+# Kotlin
+# -----------------------------------------------------------------------------
+# Keep Kotlin metadata for reflection (used by some libraries)
+-keepattributes *Annotation*
+-keepattributes RuntimeVisibleAnnotations
+-keep class kotlin.Metadata { *; }
+
+# -----------------------------------------------------------------------------
+# Jetpack Compose
+# -----------------------------------------------------------------------------
+# Compose uses reflection for state management and recomposition.
+# R8 full mode is generally Compose-aware, but these rules ensure safety.
+-dontwarn androidx.compose.**
+
+# -----------------------------------------------------------------------------
+# ZXing (QR code generation)
+# -----------------------------------------------------------------------------
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
+# -----------------------------------------------------------------------------
+# MaterialKolor
+# -----------------------------------------------------------------------------
+-dontwarn com.materialkolor.**

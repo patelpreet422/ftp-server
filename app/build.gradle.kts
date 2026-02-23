@@ -73,13 +73,28 @@ android {
     buildTypes {
         release {
             // isMinifyEnabled: When true, R8 shrinks, obfuscates, and optimizes the code.
-            // Currently disabled for easier debugging of release builds.
-            isMinifyEnabled = false
+            // This removes unused code, renames classes/methods, and optimizes bytecode.
+            isMinifyEnabled = true
+
+            // isShrinkResources: When true, removes unused resources (drawables, layouts, etc.)
+            // that are not referenced by the code after minification.
+            isShrinkResources = true
+
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+
+        // Staging: a release-like build with debug signing for internal testing.
+        // Uses the same ProGuard/R8 config as release but signed with debug key
+        // so it can be installed side-by-side with the release build on test devices.
+        create("staging") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
         }
     }
 
