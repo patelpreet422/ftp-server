@@ -4,8 +4,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.ftpserver.app.ui.screens.MainScreen
+import com.ftpserver.app.ui.screens.OnboardingScreen
+import com.ftpserver.app.ui.screens.SettingsScreen
+import com.ftpserver.app.ui.screens.ThemeMode
+import com.ftpserver.app.ui.theme.FTPServerTheme
+import com.ftpserver.app.ui.theme.PresetColors
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -192,10 +197,6 @@ class AppUiTest {
 
     // ============== SETTINGS SCREEN TESTS ==============
 
-    private fun getTestThemePrefs(): ThemePreferences {
-        return ThemePreferences(ApplicationProvider.getApplicationContext())
-    }
-
     @Test
     fun settingsScreen_displaysTitle() {
         composeTestRule.setContent {
@@ -205,13 +206,12 @@ class AppUiTest {
                     themeMode = ThemeMode.SYSTEM,
                     onSeedColorChange = {},
                     onThemeModeChange = {},
-                    onBackClick = {},
-                    themePrefs = getTestThemePrefs()
+                    onBackClick = {}
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("Settings").assertIsDisplayed()
+        composeTestRule.onNodeWithText("settings").assertIsDisplayed()
     }
 
     @Test
@@ -223,8 +223,7 @@ class AppUiTest {
                     themeMode = ThemeMode.SYSTEM,
                     onSeedColorChange = {},
                     onThemeModeChange = {},
-                    onBackClick = {},
-                    themePrefs = getTestThemePrefs()
+                    onBackClick = {}
                 )
             }
         }
@@ -241,13 +240,12 @@ class AppUiTest {
                     themeMode = ThemeMode.SYSTEM,
                     onSeedColorChange = {},
                     onThemeModeChange = {},
-                    onBackClick = {},
-                    themePrefs = getTestThemePrefs()
+                    onBackClick = {}
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("Appearance").assertIsDisplayed()
+        composeTestRule.onNodeWithText("appearance").assertIsDisplayed()
     }
 
     @Test
@@ -259,16 +257,15 @@ class AppUiTest {
                     themeMode = ThemeMode.SYSTEM,
                     onSeedColorChange = {},
                     onThemeModeChange = {},
-                    onBackClick = {},
-                    themePrefs = getTestThemePrefs()
+                    onBackClick = {}
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("Theme").assertIsDisplayed()
-        composeTestRule.onNodeWithText("System").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Light").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Dark").assertIsDisplayed()
+        composeTestRule.onNodeWithText("theme").assertIsDisplayed()
+        composeTestRule.onNodeWithText("system").assertIsDisplayed()
+        composeTestRule.onNodeWithText("light").assertIsDisplayed()
+        composeTestRule.onNodeWithText("dark").assertIsDisplayed()
     }
 
     @Test
@@ -280,12 +277,11 @@ class AppUiTest {
                     themeMode = ThemeMode.SYSTEM,
                     onSeedColorChange = {},
                     onThemeModeChange = {},
-                    onBackClick = {},
-                    themePrefs = getTestThemePrefs()
+                    onBackClick = {}
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("Accent Color").assertIsDisplayed()
+        composeTestRule.onNodeWithText("accent color").assertIsDisplayed()
     }
 }

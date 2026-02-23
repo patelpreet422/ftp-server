@@ -6,9 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Binder
-import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
@@ -130,11 +130,12 @@ class FTPServerService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(stopReceiver, IntentFilter(ACTION_STOP), Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(stopReceiver, IntentFilter(ACTION_STOP))
-        }
+        ContextCompat.registerReceiver(
+            this,
+            stopReceiver,
+            IntentFilter(ACTION_STOP),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     fun startFTPServer(username: String? = null, password: String? = null): Boolean {
