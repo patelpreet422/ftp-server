@@ -53,8 +53,8 @@ android {
         // Android uses this to apply backward-compatibility behaviors for older apps.
         targetSdk = 34
 
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -85,8 +85,8 @@ android {
         }
     }
 
-    // Custom APK naming: outputs "ftp-server-v1.0.apk" (release) or
-    // "ftp-server-v1.0-debug.apk" (debug) instead of the default "app-debug.apk".
+    // Custom APK naming: outputs "ftp-server-v1.1.0.apk" (release) or
+    // "ftp-server-v1.1.0-debug.apk" (debug) instead of the default "app-debug.apk".
     applicationVariants.all {
         outputs.all {
             val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl

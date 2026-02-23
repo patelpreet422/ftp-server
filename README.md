@@ -149,8 +149,8 @@ You do **not** need to install Java or Gradle yourself. Everything is pinned and
 
 | Variant | Path |
 |---|---|
-| Debug | `app/build/outputs/apk/debug/ftp-server-v1.0-debug.apk` |
-| Release | `app/build/outputs/apk/release/ftp-server-v1.0.apk` |
+| Debug | `app/build/outputs/apk/debug/ftp-server-v1.1.0-debug.apk` |
+| Release | `app/build/outputs/apk/release/ftp-server-v1.1.0.apk` |
 
 ### Optional: VS Code Setup
 
