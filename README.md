@@ -11,6 +11,7 @@ A beautiful and simple FTP server application for Android with a modern UI built
 - 🔒 Secure foreground service for reliable operation
 - 📱 Material Design 3 components
 - 🎨 Gradient backgrounds and smooth animations
+- 🔄 Two-way file transfer: clients can both download and upload files, create folders, rename, and delete — changes are immediately visible in the Android filesystem
 
 ## Screenshots
 
@@ -188,9 +189,14 @@ If you prefer using Android Studio:
    - Windows: File Explorer (ftp://192.168.x.x:2221)
    - macOS: Finder → Go → Connect to Server
    - FileZilla, WinSCP, or any FTP client
-5. **Tap individual fields** to copy them to clipboard
-6. **Tap "Copy Full URL"** to copy the complete connection string
-7. **Tap STOP** when finished to stop the server
+5. **Transfer files in both directions**:
+   - Download files from the device to your computer
+   - Upload files from your computer to the device
+   - Create, rename, and delete files and folders
+   - Changes appear immediately in the Android Files app and Gallery
+6. **Tap individual fields** to copy them to clipboard
+7. **Tap "Copy Full URL"** to copy the complete connection string
+8. **Tap STOP** when finished to stop the server
 
 ## Permissions Required
 
@@ -267,8 +273,9 @@ Edit the theme files in `app/src/main/java/com/ftpserver/app/ui/theme/` to custo
 - Try using the device's hostname instead of IP
 
 ### Files not accessible
-- The FTP root is located in the app's external storage
-- Files are stored in `/Android/data/com.ftpserver.app/files/ftp_root/`
+- The FTP root is the device's shared storage (`/storage/emulated/0/`)
+- Files uploaded via FTP are automatically scanned by Android's MediaScanner
+- Uploaded files and folders appear in the Files app and Gallery immediately
 - The user has full read/write permissions by default
 
 ### Build fails on first run

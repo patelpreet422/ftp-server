@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
+import org.apache.ftpserver.ftplet.Ftplet
 import org.apache.ftpserver.ftplet.UserManager
 import org.apache.ftpserver.listener.ListenerFactory
 import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory
@@ -167,6 +168,10 @@ class FTPServerService : Service() {
 
             userManager.save(user)
             serverFactory.userManager = userManager
+
+            val ftplets = LinkedHashMap<String, Ftplet>()
+            ftplets["mediaScanner"] = MediaScannerFtplet(this, homeDir.absolutePath)
+            serverFactory.ftplets = ftplets
 
             ftpServer = serverFactory.createServer()
             ftpServer?.start()
